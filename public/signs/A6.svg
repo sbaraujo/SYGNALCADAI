@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 260" width="100%" height="100%">
+  <polygon points="150,14 286,242 14,242" fill="#fbe106" stroke="#111111" stroke-width="26" stroke-linejoin="round"/>
+  <!-- Radiation Trefoil -->
+  <g transform="translate(150, 155)">
+    <circle cx="0" cy="0" r="16" fill="#111111"/>
+    <!-- Blade 1: Upwards -->
+    <path d="M -14 -22 A 26 26 0 0 1 14 -22 L 32 -56 A 64 64 0 0 0 -32 -56 Z" fill="#111111"/>
+    <!-- Blade 2: Bottom Right (120 deg) -->
+    <g transform="rotate(120)">
+      <path d="M -14 -22 A 26 26 0 0 1 14 -22 L 32 -56 A 64 64 0 0 0 -32 -56 Z" fill="#111111"/>
+    </g>
+    <!-- Blade 3: Bottom Left (240 deg) -->
+    <g transform="rotate(240)">
+      <path d="M -14 -22 A 26 26 0 0 1 14 -22 L 32 -56 A 64 64 0 0 0 -32 -56 Z" fill="#111111"/>
+    </g>
+  </g>
+</svg>

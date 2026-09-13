@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 280" width="100%" height="100%">
+  <!-- Top Square: 10º -->
+  <rect x="20" y="10" width="200" height="120" fill="#1b4d2e" rx="4"/>
+  <text x="120" y="88" fill="#ffffff" font-family="'Arial Black', Arial, sans-serif" font-weight="900" font-size="70" text-anchor="middle">10º</text>
+  <!-- Bottom Rectangle: 1º SS -->
+  <rect x="10" y="150" width="220" height="120" fill="#1b4d2e" rx="4"/>
+  <text x="120" y="235" fill="#ffffff" font-family="'Arial Black', Arial, sans-serif" font-weight="900" font-size="64" text-anchor="middle">1ºSS</text>
+</svg>

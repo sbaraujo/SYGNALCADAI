@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <rect width="200" height="200" fill="#d31a24" rx="4"/>
+  <!-- Coiled Hose in Spiral with Top Nozzle -->
+  <g fill="none" stroke="#ffffff" stroke-width="15" stroke-linecap="round">
+    <path d="M 100 48 L 160 48"/>
+    <path d="M 100 48 A 66 66 0 1 0 166 114"/>
+    <path d="M 166 114 A 50 50 0 1 1 100 64"/>
+    <path d="M 100 64 A 36 36 0 1 0 136 100"/>
+    <path d="M 136 100 A 22 22 0 1 1 100 78"/>
+  </g>
+  <!-- Nozzle head -->
+  <rect x="160" y="41" width="18" height="14" rx="2" fill="#ffffff"/>
+</svg>

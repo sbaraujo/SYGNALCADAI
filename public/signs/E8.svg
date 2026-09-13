@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <rect width="200" height="200" fill="#d31a24" rx="4"/>
+  <!-- White Bold Letter H -->
+  <g fill="#ffffff">
+    <rect x="42" y="30" width="32" height="140"/>
+    <rect x="126" y="30" width="32" height="140"/>
+    <rect x="74" y="85" width="52" height="30"/>
+  </g>
+</svg>

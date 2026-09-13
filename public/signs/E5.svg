@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <rect width="200" height="200" fill="#d31a24" rx="4"/>
+  <!-- Extinguisher Silhouette -->
+  <g fill="#ffffff">
+    <!-- Cylindrical Tank -->
+    <rect x="74" y="68" width="52" height="106" rx="16"/>
+    <!-- Tank Neck & Dome -->
+    <path d="M78 68 C78 52 122 52 122 68 Z"/>
+    <!-- Nozzle / Hose on left -->
+    <path d="M90 48 L68 54 L62 66 L74 66 L72 58 L90 52 Z"/>
+    <!-- Handle / Valve -->
+    <rect x="94" y="36" width="14" height="14" rx="3"/>
+    <path d="M96 36 C96 30 118 30 118 36 Z"/>
+  </g>
+</svg>

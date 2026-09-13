@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <rect width="200" height="200" fill="#1b4d2e" rx="4"/>
+  <!-- Closed fist breaking emergency glass bar with starburst shards -->
+  <g transform="translate(100, 100)">
+    <!-- Starburst explosion -->
+    <polygon points="0,-82 22,-36 78,-54 44,-8 82,18 32,32 46,80 0,48 -46,80 -32,32 -82,18 -44,-8 -78,-54 -22,-36" fill="#ffffff"/>
+    <polygon points="0,-64 16,-28 62,-42 34,-6 64,14 24,24 36,62 0,38 -36,62 -24,24 -64,14 -34,-6 -62,-42 -16,-28" fill="#1b4d2e"/>
+    <!-- Fist Clenching Horizontal Glass Bar -->
+    <rect x="-65" y="-12" width="130" height="24" rx="3" fill="#ffffff"/>
+    <path d="M -30 -24 L 25 -24 C 32 -24 35 -18 35 -10 L 35 15 C 35 25 28 30 18 32 L -12 32 C -22 32 -28 26 -30 18 Z" fill="#1b4d2e"/>
+    <!-- 4 Fingers -->
+    <rect x="-24" y="-22" width="10" height="36" rx="4" fill="#ffffff"/>
+    <rect x="-12" y="-24" width="10" height="38" rx="4" fill="#ffffff"/>
+    <rect x="0" y="-24" width="10" height="38" rx="4" fill="#ffffff"/>
+    <rect x="12" y="-22" width="10" height="36" rx="4" fill="#ffffff"/>
+    <!-- Forearm -->
+    <path d="M -15 20 L 15 20 L 28 65 L -2 65 Z" fill="#ffffff"/>
+  </g>
+</svg>

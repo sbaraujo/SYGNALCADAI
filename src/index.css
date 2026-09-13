@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+/* Estilos de Impressão Profissional para Prancha A3 e Plano de Emergência */
+@media print {
+  @page {
+    size: A3 landscape;
+    margin: 0;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+  }
+
+  /* Oculta tudo que não for prancha quando estiver imprimindo prancha A3 */
+  body.printing-prancha #root > div > header,
+  body.printing-prancha #root > div > div > aside,
+  body.printing-prancha .print-hide {
+    display: none !important;
+  }
+
+  /* Quando imprimindo prancha A3 específica */
+  .a3-sheet-print-container {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+  }
+
+  /* Evita quebras de página indesejadas */
+  .no-page-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 340" width="100%" height="100%">
+  <rect width="540" height="340" fill="#2a8553" rx="6"/>
+  <text x="270" y="44" fill="#ffffff" font-family="'Arial Black', Arial, sans-serif" font-weight="900" font-size="16" text-anchor="middle">Esta edificação está dotada dos seguintes</text>
+  <text x="270" y="68" fill="#ffffff" font-family="'Arial Black', Arial, sans-serif" font-weight="900" font-size="16" text-anchor="middle">sistemas de Segurança contra Incêndio:</text>
+  
+  <g fill="#ffffff" font-family="Arial, sans-serif" font-weight="bold" font-size="13.5" text-anchor="middle">
+    <text x="270" y="104">. Extintores de Incêndio</text>
+    <text x="270" y="126">. Hidrantes</text>
+    <text x="270" y="148">. Iluminação de Emergência</text>
+    <text x="270" y="170">. Alarme de Incêndio</text>
+    <text x="270" y="192">. Detecção Automática de Fumaça/Calor</text>
+    <text x="270" y="214">. Chuveiros Automáticos</text>
+    <text x="270" y="236">. Escada de Segurança</text>
+    <text x="270" y="258">. Sinalização de Emergência</text>
+    <text x="270" y="278">-</text>
+    <text x="270" y="296">Edificação em Estrutura Metálica</text>
+  </g>
+</svg>

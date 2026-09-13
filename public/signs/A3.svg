@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 260" width="100%" height="100%">
+  <polygon points="150,14 286,242 14,242" fill="#fbe106" stroke="#111111" stroke-width="26" stroke-linejoin="round"/>
+  <!-- Exploding Bomb and blast fragments -->
+  <circle cx="106" cy="180" r="26" fill="#111111"/>
+  <polygon points="106,170 185,92 195,102 116,180" fill="#111111"/>
+  <polygon points="112,165 210,118 216,128 120,175" fill="#111111"/>
+  <polygon points="120,172 225,152 227,162 122,180" fill="#111111"/>
+  <polygon points="115,182 220,192 216,202 115,188" fill="#111111"/>
+  <polygon points="100,165 150,85 160,90 108,170" fill="#111111"/>
+  <polygon points="90,165 120,80 130,85 96,170" fill="#111111"/>
+  <polygon points="85,175 60,115 70,110 92,175" fill="#111111"/>
+  <!-- flying debris dots -->
+  <rect x="180" y="75" width="10" height="8" rx="2" fill="#111111" transform="rotate(25 185 79)"/>
+  <rect x="220" y="105" width="12" height="10" rx="3" fill="#111111" transform="rotate(-15 226 110)"/>
+  <rect x="235" y="170" width="14" height="9" rx="2" fill="#111111"/>
+  <rect x="150" y="65" width="9" height="12" rx="2" fill="#111111"/>
+  <rect x="125" y="115" width="8" height="15" rx="2" fill="#111111"/>
+</svg>

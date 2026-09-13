@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <rect width="200" height="200" fill="#d31a24" rx="4"/>
+  <!-- Fire Blanket / Cobertor de Combate -->
+  <g fill="#ffffff">
+    <!-- Head with flame on top -->
+    <circle cx="94" cy="74" r="14"/>
+    <path d="M78 52 C82 36 94 22 96 34 C99 22 108 26 108 40 C116 32 122 42 118 52 C112 48 108 55 104 56 C100 50 94 54 90 56 Z"/>
+    <!-- Torso and arms holding fire blanket sheet -->
+    <path d="M82 92 L106 92 L142 126 L124 168 L64 168 L48 126 Z" fill="none" stroke="#ffffff" stroke-width="12" stroke-linejoin="round"/>
+    <polygon points="86,92 102,92 124,142 66,142"/>
+  </g>
+</svg>

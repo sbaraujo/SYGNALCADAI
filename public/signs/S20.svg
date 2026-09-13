@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <rect width="200" height="200" fill="#1b4d2e" rx="4"/>
+  <!-- Person pushing emergency door latch button -->
+  <g transform="translate(10, 10)">
+    <circle cx="94" cy="48" r="12" fill="#ffffff"/>
+    <path d="M88 64 L108 68 L124 88 L112 94 L102 78 L86 74 Z" fill="#ffffff"/>
+    <path d="M84 64 L96 102 L90 108 L74 74 Z" fill="#ffffff"/>
+    <path d="M96 102 L122 128 L146 150 L136 156 L112 136 L88 110 Z" fill="#ffffff"/>
+    <path d="M78 100 L60 126 L36 136 L40 124 L58 116 L72 94 Z" fill="#ffffff"/>
+    <!-- Emergency switch on wall -->
+    <rect x="146" y="24" width="8" height="136" fill="#ffffff"/>
+    <rect x="134" y="80" width="12" height="24" rx="3" fill="#ffffff"/>
+    <!-- Push arrow -->
+    <polygon points="132,108 120,102 120,114" fill="#ffffff"/>
+  </g>
+</svg>

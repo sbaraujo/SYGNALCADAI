@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 260" width="100%" height="100%">
+  <polygon points="150,14 286,242 14,242" fill="#fbe106" stroke="#111111" stroke-width="26" stroke-linejoin="round"/>
+  <!-- Test tube pouring on bar -->
+  <g transform="translate(132, 92) rotate(-30)">
+    <rect x="0" y="0" width="46" height="14" rx="7" fill="#111111"/>
+    <rect x="4" y="2" width="38" height="10" rx="5" fill="#fbe106"/>
+    <circle cx="4" cy="7" r="3" fill="#111111"/>
+  </g>
+  <!-- Drops on bar -->
+  <circle cx="116" cy="130" r="3.5" fill="#111111"/>
+  <circle cx="116" cy="144" r="4.5" fill="#111111"/>
+  <circle cx="116" cy="160" r="4" fill="#111111"/>
+  <!-- Corroding solid bar -->
+  <path d="M80 172 L110 172 C113 172 114 177 117 177 C120 177 121 172 124 172 L136 172 L136 186 L80 186 Z" fill="#111111"/>
+  <!-- Test tube pouring on hand -->
+  <g transform="translate(148, 118) rotate(-30)">
+    <rect x="0" y="0" width="46" height="14" rx="7" fill="#111111"/>
+    <rect x="4" y="2" width="38" height="10" rx="5" fill="#fbe106"/>
+    <circle cx="4" cy="7" r="3" fill="#111111"/>
+  </g>
+  <!-- Drops on hand -->
+  <circle cx="170" cy="136" r="3.5" fill="#111111"/>
+  <circle cx="170" cy="150" r="4.5" fill="#111111"/>
+  <circle cx="170" cy="164" r="4" fill="#111111"/>
+  <!-- Human hand with corroded ditch -->
+  <path d="M142 178 C148 168 162 168 166 174 C169 178 172 178 175 174 C178 168 190 168 196 172 L225 172 L230 186 L205 198 L152 198 L142 188 Z" fill="#111111"/>
+</svg>

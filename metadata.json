@@ -1,0 +1,6 @@
+{
+  "name": "SIGNAFLUX CAD AI",
+  "description": "Sistema Inteligente de Projeto CAD 2D, Biblioteca Fotoluminescente, Quantitativos, Orçamento em Reais (R$) e Pranchas A3 de Segurança contra Incêndio (ABNT NBR 13434 / NBR 16820 / IT 20)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
