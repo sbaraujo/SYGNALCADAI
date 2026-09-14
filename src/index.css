@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Dimensões e Estilos Padronizados da Prancha A3 Paisagem (420 x 297 mm) */
+.a3-sheet-print-container {
+  width: 1190px;
+  height: 841px;
+  max-width: 1190px;
+  max-height: 841px;
+  box-sizing: border-box;
+}
+
 /* Estilos de Impressão Profissional para Prancha A3 e Plano de Emergência */
 @media print {
   @page {
@@ -37,5 +46,10 @@
   .no-page-break {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  .page-break-after {
+    page-break-after: always;
+    break-after: page;
   }
 }

@@ -644,6 +644,8 @@ export const App: React.FC = () => {
           <PranchasA3View
             project={project}
             symbolsCatalog={symbolsCatalog}
+            suppliers={suppliers}
+            products={products}
             onUpdateProject={(up) => {
               setProject(up);
               triggerAutosave(up);

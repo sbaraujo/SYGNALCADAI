@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import QRCode from 'qrcode';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import { 
   Project, Floor, SignSymbol, 
   EvacuationArrowItem, EvacuationArrowType, 
@@ -367,7 +367,17 @@ export const EvacuationPlanView: React.FC<EvacuationPlanViewProps> = ({
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
-        logging: false
+        logging: false,
+        imageTimeout: 15000,
+        onclone: (_clonedDoc, clonedEl) => {
+          clonedEl.style.transform = 'none';
+          clonedEl.style.boxShadow = 'none';
+          const svgs = clonedEl.querySelectorAll('svg');
+          svgs.forEach((svg) => {
+            svg.setAttribute('shape-rendering', 'geometricPrecision');
+            svg.setAttribute('text-rendering', 'geometricPrecision');
+          });
+        }
       });
 
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
@@ -407,7 +417,17 @@ export const EvacuationPlanView: React.FC<EvacuationPlanViewProps> = ({
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
-        logging: false
+        logging: false,
+        imageTimeout: 15000,
+        onclone: (_clonedDoc, clonedEl) => {
+          clonedEl.style.transform = 'none';
+          clonedEl.style.boxShadow = 'none';
+          const svgs = clonedEl.querySelectorAll('svg');
+          svgs.forEach((svg) => {
+            svg.setAttribute('shape-rendering', 'geometricPrecision');
+            svg.setAttribute('text-rendering', 'geometricPrecision');
+          });
+        }
       });
 
       const dataUrl = canvas.toDataURL(format === 'png' ? 'image/png' : 'image/jpeg', 0.95);
