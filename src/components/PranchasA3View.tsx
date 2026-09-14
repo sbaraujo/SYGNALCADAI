@@ -8,7 +8,7 @@ import {
   ZoomIn, ZoomOut, RotateCcw, Image as ImageIcon, Save,
   FileCode, Settings, Compass, Sparkles, Sliders, Check,
   Table, Building2, ShieldCheck, DollarSign, BookOpen, ChevronDown,
-  FileCheck
+  FileCheck, ListFilter
 } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import jsPDF from 'jspdf';
@@ -39,9 +39,14 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
   const [selectedFloorId, setSelectedFloorId] = useState<string>(project.floors[0]?.id || '');
   const activeFloor = project.floors.find((f) => f.id === selectedFloorId) || project.floors[0];
 
-  // Visualização de folhas (Prancha A3 Integrada, Folha 01: Desenho Gráfico, Folha 02: Orçamento Consolidado ABNT, Dossiê Completo)
-  const [activeSheetTab, setActiveSheetTab] = useState<'unified' | 'drawing' | 'budget' | 'both'>('unified');
+  // Visualização de folhas (Prancha A3 Integrada, Folha 01: Desenho Gráfico, Folha 02: Orçamento Consolidado ABNT, Folha 03: Legenda Técnica Dinâmica, Dossiê Completo)
+  const [activeSheetTab, setActiveSheetTab] = useState<'unified' | 'drawing' | 'budget' | 'legend' | 'both'>('unified');
   const [budgetScope, setBudgetScope] = useState<'floor' | 'project'>('floor');
+
+  // Configurações da Legenda Dinâmica ABNT NBR 13434 / NBR 16820
+  const [legendScope, setLegendScope] = useState<'floor' | 'project'>('floor');
+  const [legendGrouping, setLegendGrouping] = useState<'category' | 'code'>('category');
+  const [includeLegendSpecs, setIncludeLegendSpecs] = useState<boolean>(true);
 
   // Configurações visuais do viewport
   const [scaleFactor, setScaleFactor] = useState<string>('1:100');
@@ -72,9 +77,124 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
   const unifiedSheetRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const budgetSheetRef = useRef<HTMLDivElement>(null);
+  const legendSheetRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Símbolos utilizados no pavimento ativo (para a legenda do desenho gráfico)
+  // ================= LEGENDA DINÂMICA EM PDF (ABNT NBR 13434 / NBR 16820) =================
+  // Processa dinamicamente todos os símbolos posicionados com especificações técnicas reais
+  interface DynamicLegendEntry {
+    symbol: SignSymbol;
+    count: number;
+    category: string;
+    categoryLabel: string;
+    categoryColor: string;
+    dimensions: string;
+    viewDistanceMeters: number;
+    luminance: string;
+    standard: string;
+    floors: string[];
+  }
+
+  const categoryInfo: Record<string, { label: string; color: string; order: number }> = {
+    'ORIENTACAO_SALVAMENTO': { label: 'Orientação e Salvamento (Rotas de Fuga e Saídas)', color: '#16a34a', order: 1 },
+    'EQUIPAMENTOS': { label: 'Equipamentos de Combate a Incêndio e Alarme', color: '#dc2626', order: 2 },
+    'ALERTA': { label: 'Sinalização de Alerta e Atenção', color: '#ca8a04', order: 3 },
+    'PROIBICAO': { label: 'Sinalização de Proibição', color: '#b91c1c', order: 4 },
+    'COMPLEMENTAR': { label: 'Sinalização Complementar de Indicação', color: '#2563eb', order: 5 },
+    'OUTROS': { label: 'Outros Dispositivos e Sinalizadores', color: '#475569', order: 6 }
+  };
+
+  const dynamicLegendItems = useMemo<DynamicLegendEntry[]>(() => {
+    const map = new Map<string, DynamicLegendEntry>();
+    const symbolsToCount = legendScope === 'floor'
+      ? (activeFloor?.placedSymbols || [])
+      : project.floors.flatMap((f) => f.placedSymbols);
+
+    symbolsToCount.forEach((ps) => {
+      const def = symbolsCatalog.find((s) => s.id === ps.symbol_id);
+      if (!def) return;
+
+      const floorName = project.floors.find((f) => f.id === ps.floor_id)?.name || activeFloor?.name || 'Pavimento';
+      const cat = def.categoria || 'OUTROS';
+      const catMeta = categoryInfo[cat] || categoryInfo['OUTROS'];
+      const qty = ps.quantity || 1;
+
+      // Distância máxima de visibilidade conforme NBR 13434: d = sqrt(S/2000)
+      const areaMm2 = (def.largura || 200) * (def.altura || 200);
+      const viewDist = Math.round(Math.sqrt(areaMm2 / 2000) * 10) / 10 || 4.5;
+      const luminance = def.fotoluminescente_grau || 'Classe C (140 mcd/m² @ 10min)';
+      const standard = def.norma_referencia || 'NBR 13434 / NBR 16820';
+
+      const existing = map.get(def.id);
+      if (existing) {
+        existing.count += qty;
+        if (!existing.floors.includes(floorName)) {
+          existing.floors.push(floorName);
+        }
+      } else {
+        map.set(def.id, {
+          symbol: def,
+          count: qty,
+          category: cat,
+          categoryLabel: catMeta.label,
+          categoryColor: catMeta.color,
+          dimensions: `${def.largura || 200}x${def.altura || 200} mm`,
+          viewDistanceMeters: viewDist,
+          luminance,
+          standard,
+          floors: [floorName]
+        });
+      }
+    });
+
+    const items = Array.from(map.values());
+    if (legendGrouping === 'category') {
+      return items.sort((a, b) => {
+        const orderA = categoryInfo[a.category]?.order || 99;
+        const orderB = categoryInfo[b.category]?.order || 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.symbol.codigo_normativo || a.symbol.codigo_interno).localeCompare(
+          b.symbol.codigo_normativo || b.symbol.codigo_interno
+        );
+      });
+    } else {
+      return items.sort((a, b) => {
+        return (a.symbol.codigo_normativo || a.symbol.codigo_interno).localeCompare(
+          b.symbol.codigo_normativo || b.symbol.codigo_interno
+        );
+      });
+    }
+  }, [legendScope, legendGrouping, activeFloor, project, symbolsCatalog]);
+
+  const totalDynamicSignsCount = useMemo(() => {
+    return dynamicLegendItems.reduce((acc, item) => acc + item.count, 0);
+  }, [dynamicLegendItems]);
+
+  // Agrupamento por Categoria para a Legenda Dinâmica em PDF
+  const dynamicLegendByCategory = useMemo(() => {
+    const groups: Record<string, { meta: { label: string; color: string; order: number }; items: DynamicLegendEntry[]; totalCount: number }> = {};
+    dynamicLegendItems.forEach((entry) => {
+      const cat = entry.category;
+      if (!groups[cat]) {
+        groups[cat] = {
+          meta: categoryInfo[cat] || categoryInfo['OUTROS'],
+          items: [],
+          totalCount: 0
+        };
+      }
+      groups[cat].items.push(entry);
+      groups[cat].totalCount += entry.count;
+    });
+
+    return Object.entries(groups)
+      .sort(([, a], [, b]) => a.meta.order - b.meta.order)
+      .map(([catKey, data]) => ({
+        categoryKey: catKey,
+        ...data
+      }));
+  }, [dynamicLegendItems]);
+
+  // Símbolos utilizados no pavimento ativo (compatibilidade legada)
   const floorSymbolsMap = new Map<string, { symbol: SignSymbol; count: number }>();
   activeFloor?.placedSymbols.forEach((ps) => {
     const def = symbolsCatalog.find((s) => s.id === ps.symbol_id);
@@ -268,53 +388,77 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
   const handleExecutePdfExport = async (config: PdfExportConfig) => {
     setIsExporting(true);
     setProgressPercent(10);
-    setExportMessage('Configurando página A3 paisagem (420 x 297 mm)...');
+    setExportMessage('Sincronizando pranchas e tipografia ABNT...');
 
     try {
-      // 1. Sincroniza a aba ativa com o conteúdo solicitado para garantir montagem correta no DOM
-      if (config.content === 'unified' && activeSheetTab !== 'unified') {
-        setActiveSheetTab('unified');
-        await new Promise((r) => setTimeout(r, 150));
-      } else if (config.content === 'drawing' && activeSheetTab !== 'drawing') {
-        setActiveSheetTab('drawing');
-        await new Promise((r) => setTimeout(r, 150));
-      } else if (config.content === 'budget' && activeSheetTab !== 'budget') {
-        setActiveSheetTab('budget');
-        await new Promise((r) => setTimeout(r, 150));
-      } else if (config.content === 'dossier' && activeSheetTab !== 'both') {
-        setActiveSheetTab('both');
-        await new Promise((r) => setTimeout(r, 150));
-      } else {
-        await new Promise((r) => setTimeout(r, 80));
+      // 0. Sincroniza parâmetros de renderização selecionados pelo usuário
+      if (config.budgetScope) setBudgetScope(config.budgetScope);
+      if (config.symbolDisplayMode) setSymbolDisplayMode(config.symbolDisplayMode);
+      if (config.legendMode) setLegendScope(config.legendMode);
+      if (config.legendGrouping) setLegendGrouping(config.legendGrouping);
+      if (config.includeLegendSpecs !== undefined) setIncludeLegendSpecs(config.includeLegendSpecs);
+
+      // Aguarda o carregamento das fontes para evitar reflow ou texto truncado
+      try {
+        if (document.fonts) {
+          await document.fonts.ready;
+        }
+      } catch (fontErr) {
+        console.warn('Verificação de fontes concluída com aviso:', fontErr);
       }
 
-      // 2. Localiza os contêineres '.a3-sheet-print-container' no DOM
-      let targetContainers = Array.from(
-        document.querySelectorAll<HTMLElement>('.a3-sheet-print-container')
-      );
+      // 1. Sincroniza a aba ativa com o conteúdo solicitado para garantir montagem correta no DOM
+      if (config.content === 'unified') {
+        setActiveSheetTab('unified');
+      } else if (config.content === 'drawing') {
+        setActiveSheetTab('drawing');
+      } else if (config.content === 'budget') {
+        setActiveSheetTab('budget');
+      } else if (config.content === 'legend_sheet') {
+        setActiveSheetTab('legend');
+      } else if (config.content === 'dossier') {
+        setActiveSheetTab('both');
+      }
+      
+      // Delay tático para renderização completa do layout React
+      await new Promise((r) => setTimeout(r, 200));
 
-      // Fallback para refs diretas caso a busca por classe não localize nós
+      // 2. Localiza os contêineres '.a3-sheet-print-container' no DOM
+      let targetContainers: HTMLElement[] = [];
+
+      if (config.content === 'unified' && unifiedSheetRef.current) {
+        targetContainers = [unifiedSheetRef.current];
+      } else if (config.content === 'drawing' && sheetRef.current) {
+        targetContainers = [sheetRef.current];
+      } else if (config.content === 'budget' && budgetSheetRef.current) {
+        targetContainers = [budgetSheetRef.current];
+      } else if (config.content === 'legend_sheet' && legendSheetRef.current) {
+        targetContainers = [legendSheetRef.current];
+      } else if (config.content === 'dossier') {
+        targetContainers = [
+          sheetRef.current,
+          budgetSheetRef.current,
+          config.includeLegendSheetInDossier ? legendSheetRef.current : null
+        ].filter(Boolean) as HTMLElement[];
+      }
+
+      // Fallback para seleção por classe caso refs diretas não bastem
       if (targetContainers.length === 0) {
-        if (config.content === 'unified' && unifiedSheetRef.current) {
-          targetContainers = [unifiedSheetRef.current];
-        } else if (config.content === 'drawing' && sheetRef.current) {
-          targetContainers = [sheetRef.current];
-        } else if (config.content === 'budget' && budgetSheetRef.current) {
-          targetContainers = [budgetSheetRef.current];
-        } else if (config.content === 'dossier') {
-          targetContainers = [sheetRef.current, budgetSheetRef.current].filter(Boolean) as HTMLElement[];
-        }
+        targetContainers = Array.from(
+          document.querySelectorAll<HTMLElement>('.a3-sheet-print-container')
+        );
       }
 
       if (targetContainers.length === 0) {
         throw new Error('Nenhum contêiner .a3-sheet-print-container encontrado no DOM para exportação.');
       }
 
-      // 3. Define parâmetros de alta fidelidade para renderização
+      // 3. Define parâmetros de alta fidelidade e otimização de renderização
       const scale = config.quality === 'ultra' ? 3.0 : config.quality === 'high' ? 2.5 : 1.8;
-      const imgType = config.imageFormat === 'png' ? 'image/png' : 'image/jpeg';
-      const pdfFormatType = config.imageFormat === 'png' ? 'PNG' : 'JPEG';
-      const compression = config.imageFormat === 'png' ? undefined : 0.98;
+      const isPng = config.imageFormat === 'png';
+      const imgType = isPng ? 'image/png' : 'image/jpeg';
+      const pdfFormatType = isPng ? 'PNG' : 'JPEG';
+      const compression = isPng ? undefined : 0.98;
 
       // 4. Instancia jsPDF configurado estritamente para A3 Paisagem (420 x 297 mm)
       const doc = new jsPDF({
@@ -329,7 +473,7 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
         const container = targetContainers[i];
         const stepPercent = Math.round(20 + (i / targetContainers.length) * 65);
         setProgressPercent(stepPercent);
-        setExportMessage(`Renderizando folha ${i + 1} de ${targetContainers.length} em alta fidelidade (${scale}x)...`);
+        setExportMessage(`Renderizando folha ${i + 1} de ${targetContainers.length} em alta resolução (${scale}x)...`);
 
         const canvas = await html2canvas(container, {
           scale,
@@ -346,11 +490,22 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
             clonedEl.style.transform = 'none';
             clonedEl.style.boxShadow = 'none';
             clonedEl.style.margin = '0';
+            
+            // Otimização de renderização: remove animações, transições e efeitos pesados
+            if (config.optimizeRendering) {
+              const allEls = clonedEl.querySelectorAll('*');
+              allEls.forEach((el) => {
+                (el as HTMLElement).style.animation = 'none';
+                (el as HTMLElement).style.transition = 'none';
+              });
+            }
+
             // Garante alta fidelidade geométrica dos vetores SVG (linhas CAD, cotas, símbolos e textos)
             const svgs = clonedEl.querySelectorAll('svg');
             svgs.forEach((svg) => {
               svg.setAttribute('shape-rendering', 'geometricPrecision');
               svg.setAttribute('text-rendering', 'geometricPrecision');
+              svg.setAttribute('color-rendering', 'optimizeQuality');
             });
           }
         });
@@ -363,6 +518,13 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
 
         // Adiciona a imagem cobrindo integralmente as dimensões da prancha A3 Paisagem (420 x 297 mm)
         doc.addImage(imgData, pdfFormatType, 0, 0, 420, 297, undefined, 'FAST');
+
+        // Limpeza de memória do canvas para acelerar processamento de múltiplas páginas
+        canvas.width = 1;
+        canvas.height = 1;
+
+        // Yield para suavizar a interface e atualizar a barra de progresso
+        await new Promise((r) => setTimeout(r, 60));
       }
 
       setProgressPercent(92);
@@ -375,6 +537,8 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
         ? 'CADERNO_TECNICO_COMPLETO_A3'
         : config.content === 'drawing'
         ? 'PRANCHA_A3_GRAFICA'
+        : config.content === 'legend_sheet'
+        ? 'FOLHA_03_LEGENDA_TECNICA_A3'
         : 'PRANCHA_A3_ORCAMENTO_ABNT';
 
       const safeProjectName = (project.nome || 'PROJETO').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -401,22 +565,42 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
     }
   };
 
+  // Construtor utilitário para objeto de configuração PdfExportConfig completo
+  const createExportConfig = (overrides: Partial<PdfExportConfig> = {}): PdfExportConfig => ({
+    content: 'unified',
+    quality: 'high',
+    imageFormat: 'jpeg',
+    includeFloorPlan: true,
+    includeCadEntities: true,
+    includeNorthCompass: true,
+    includeGraphicScale: true,
+    symbolDisplayMode,
+    budgetScope,
+    includeNormativeNotes: true,
+    includeCategorySummary: true,
+    includeSignatures: true,
+    legendMode: legendScope,
+    legendGrouping: legendGrouping,
+    includeLegendSpecs,
+    includeLegendQuantities: true,
+    includeLegendSheetInDossier: true,
+    optimizeRendering: true,
+    vectorAntiAliasing: true,
+    ...overrides
+  });
+
   // Exportação Direta de 1 Clique (Captura o container .a3-sheet-print-container ativo via jsPDF)
   const handleQuickPdfExport = () => {
-    handleExecutePdfExport({
-      content: activeSheetTab === 'both' ? 'dossier' : activeSheetTab,
-      quality: 'high',
-      imageFormat: 'jpeg',
-      includeFloorPlan: true,
-      includeCadEntities: true,
-      includeNorthCompass: true,
-      includeGraphicScale: true,
-      symbolDisplayMode,
-      budgetScope,
-      includeNormativeNotes: true,
-      includeCategorySummary: true,
-      includeSignatures: true
-    });
+    const targetContent = 
+      activeSheetTab === 'both' ? 'dossier' : 
+      activeSheetTab === 'legend' ? 'legend_sheet' : 
+      activeSheetTab;
+
+    handleExecutePdfExport(
+      createExportConfig({
+        content: targetContent
+      })
+    );
   };
 
   // Exportar Imagem HD (PNG)
@@ -736,43 +920,50 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
             </div>
           </div>
 
-          {/* LEGENDA TÉCNICA DE SÍMBOLOS (LADO DIREITO - 330px) */}
+          {/* LEGENDA TÉCNICA DINÂMICA DE SÍMBOLOS (LADO DIREITO - 330px) */}
           <div className="w-[330px] shrink-0 flex flex-col bg-white overflow-hidden text-[9px]">
             <div className="bg-slate-900 text-white p-2 font-mono flex items-center justify-between shrink-0">
               <div>
-                <strong className="text-[10px] uppercase tracking-wider block">LEGENDA NORMATIVA</strong>
-                <span className="text-[7.5px] text-slate-300">ABNT NBR 13434 / NBR 16820</span>
+                <strong className="text-[10px] uppercase tracking-wider block">LEGENDA NORMATIVA DINÂMICA</strong>
+                <span className="text-[7.5px] text-slate-300">ABNT NBR 13434 / NBR 16820 • {legendScope === 'floor' ? activeFloor.name : 'Geral'}</span>
               </div>
               <span className="bg-red-700 text-white text-[8px] font-bold px-1.5 py-0.5 rounded">
-                {totalSignsCount} un
+                {totalDynamicSignsCount} un
               </span>
             </div>
 
             <div className="flex-1 overflow-y-auto p-1.5 space-y-1 divide-y divide-slate-100">
-              {legendList.length === 0 ? (
+              {dynamicLegendItems.length === 0 ? (
                 <div className="p-4 text-center text-slate-400 italic">
                   Nenhum símbolo posicionado neste pavimento.
                 </div>
               ) : (
-                legendList.map(({ symbol, count }) => (
-                  <div key={symbol.id} className="pt-1 flex items-center gap-1.5">
+                dynamicLegendItems.map((item) => (
+                  <div key={item.symbol.id} className="pt-1 flex items-center gap-1.5">
                     <div className="w-7 h-6 flex items-center justify-center bg-slate-50 border border-slate-300 rounded shrink-0 overflow-hidden">
-                      <SymbolGlyph symbol={symbol} width={22} height={22} />
+                      <SymbolGlyph symbol={item.symbol} width={22} height={22} />
                     </div>
                     <div className="flex-1 min-w-0 leading-tight">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-red-700 font-mono text-[8.5px]">
-                          {symbol.codigo_normativo}
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-bold text-red-700 font-mono text-[8.5px]">
+                            {item.symbol.codigo_normativo || item.symbol.codigo_interno}
+                          </span>
+                          <span
+                            className="w-1.5 h-1.5 rounded-full inline-block"
+                            style={{ backgroundColor: item.categoryColor }}
+                            title={item.categoryLabel}
+                          />
+                        </div>
                         <span className="font-bold font-mono text-[8px] bg-slate-100 px-1 rounded">
-                          {count} un
+                          {item.count} un
                         </span>
                       </div>
                       <span className="font-semibold text-slate-900 block truncate text-[8px]">
-                        {symbol.nome}
+                        {item.symbol.nome}
                       </span>
                       <span className="text-[7px] text-slate-500 block truncate">
-                        {symbol.largura}x{symbol.altura} mm • {symbol.fotoluminescente_grau || 'Classe C'}
+                        {item.dimensions} {includeLegendSpecs && `• d_visib ≤ ${item.viewDistanceMeters}m`} • {item.luminance.split(' ')[0]}
                       </span>
                     </div>
                   </div>
@@ -1241,23 +1432,23 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
             </div>
           </div>
 
-          {/* 2. LEGENDA TÉCNICA LATERAL NORMATIVA NBR 13434 */}
+          {/* 2. LEGENDA TÉCNICA DINÂMICA LATERAL NORMATIVA NBR 13434 */}
           <div className="w-72 bg-white flex flex-col justify-between overflow-hidden text-black select-none">
             <div className="flex-1 overflow-hidden flex flex-col">
               <div className="p-2 bg-slate-900 text-white font-bold text-[11px] uppercase tracking-wider text-center border-b border-black flex items-center justify-between">
-                <span>Legenda Normativa</span>
+                <span>Legenda Dinâmica</span>
                 <span className="text-[10px] text-slate-300 font-mono font-normal">
-                  Total: {totalSignsCount} un
+                  Total: {totalDynamicSignsCount} un
                 </span>
               </div>
 
               <div className="flex-1 overflow-y-auto p-1.5 space-y-1 text-[10px]">
-                {legendList.length === 0 ? (
+                {dynamicLegendItems.length === 0 ? (
                   <div className="p-4 text-center text-slate-400 text-[10px]">
-                    Nenhum símbolo inserido neste pavimento.
+                    Nenhum símbolo posicionado neste pavimento.
                   </div>
                 ) : (
-                  legendList.map((item) => (
+                  dynamicLegendItems.map((item) => (
                     <div
                       key={item.symbol.id}
                       className="flex items-center gap-2 p-1 border border-slate-200 rounded hover:bg-slate-50 transition"
@@ -1267,9 +1458,16 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-bold flex justify-between items-center">
-                          <span className="text-red-700 font-mono text-[11px]">
-                            {item.symbol.codigo_normativo}
-                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-red-700 font-mono text-[11px]">
+                              {item.symbol.codigo_normativo || item.symbol.codigo_interno}
+                            </span>
+                            <span
+                              className="w-1.5 h-1.5 rounded-full inline-block"
+                              style={{ backgroundColor: item.categoryColor }}
+                              title={item.categoryLabel}
+                            />
+                          </div>
                           <span className="bg-slate-900 text-white font-mono px-1.5 py-0.5 rounded text-[9px]">
                             {item.count} un
                           </span>
@@ -1278,7 +1476,7 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
                           {item.symbol.nome}
                         </div>
                         <div className="text-[8px] font-mono text-slate-500">
-                          Dim: {item.symbol.largura}x{item.symbol.altura} mm | {item.symbol.norma_referencia || 'NBR 13434'}
+                          Dim: {item.dimensions} {includeLegendSpecs && `| Visib: ≤${item.viewDistanceMeters}m`}
                         </div>
                       </div>
                     </div>
@@ -1620,6 +1818,286 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
     </div>
   );
 
+  // ================= FOLHA 03: LEGENDA TÉCNICA DINÂMICA A3 (NBR 13434 / NBR 16820) =================
+  const renderLegendSheet = () => (
+    <div
+      ref={legendSheetRef}
+      className="a3-sheet-print-container bg-white text-black shadow-2xl relative overflow-hidden flex flex-col mx-auto"
+      style={{
+        width: '1190px',
+        height: '841px',
+        maxWidth: '1190px',
+        maxHeight: '841px',
+        padding: '25px 15px 15px 35px', // Margens ABNT: Esquerda 25mm (35px), Outras 10mm (15px)
+        boxSizing: 'border-box',
+        backgroundColor: '#ffffff'
+      }}
+    >
+      {/* MOLDURA E BORDAS REGULAMENTARES ABNT NBR 6492 */}
+      <div className="w-full h-full border-2 border-black flex flex-col relative overflow-hidden bg-white">
+        
+        {/* CABEÇALHO DA PRANCHA DE LEGENDA */}
+        <div className="h-16 bg-slate-900 text-white px-4 flex items-center justify-between border-b-2 border-black shrink-0 select-none">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded bg-red-700 flex items-center justify-center font-black text-lg text-white shadow-xs">
+              L3
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm font-black tracking-wider uppercase text-white leading-none">
+                  LEGENDA TÉCNICA NORMATIVA & ESPECIFICAÇÕES DE SINALIZAÇÃO DE EMERGÊNCIA
+                </h1>
+                <span className="bg-red-700 text-white font-mono text-[9px] font-bold px-1.5 py-0.5 rounded">
+                  ABNT NBR 13434 / NBR 16820
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-300 block mt-0.5">
+                Escopo: {legendScope === 'floor' ? `Pavimento ${activeFloor.name}` : `Edifício Completo (${project.floors.length} pavimentos)`} • {dynamicLegendItems.length} tipos de sinalizadores cadastrados • {totalDynamicSignsCount} unidades no total
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 font-mono text-xs">
+            <div className="bg-slate-800 border border-slate-700 px-2.5 py-1 rounded text-right">
+              <span className="text-[9px] text-slate-400 block leading-none">TOTAL DE PEÇAS</span>
+              <strong className="text-emerald-400 text-sm">{totalDynamicSignsCount} un</strong>
+            </div>
+            <div className="bg-slate-800 border border-slate-700 px-2.5 py-1 rounded text-right">
+              <span className="text-[9px] text-slate-400 block leading-none">CATEGORIAS ABNT</span>
+              <strong className="text-sky-300 text-sm">{dynamicLegendByCategory.length} classes</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* CORPO PRINCIPAL DA FOLHA DE LEGENDA (Divisão em 2 colunas: Bento Grid de Símbolos + Painel Normativo/Quadro) */}
+        <div className="flex-1 flex overflow-hidden">
+          
+          {/* COLUNA ESQUERDA: GRID DE SÍMBOLOS DINÂMICOS COM DETALHES TÉCNICOS */}
+          <div className="flex-1 p-3 overflow-y-auto bg-slate-50/50 flex flex-col space-y-3">
+            {dynamicLegendItems.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-slate-400 italic p-8 text-center border border-dashed border-slate-300 rounded-lg">
+                <FileText className="w-12 h-12 text-slate-300 mb-2" />
+                <p className="font-bold text-sm text-slate-600">Nenhum símbolo posicionado no escopo selecionado.</p>
+                <p className="text-xs text-slate-400 mt-1">Adicione sinalizadores no editor gráfico para compor a legenda técnica oficial.</p>
+              </div>
+            ) : (
+              dynamicLegendByCategory.map((catGroup) => (
+                <div key={catGroup.categoryKey} className="bg-white border border-slate-300 rounded-lg overflow-hidden shadow-xs">
+                  {/* Cabeçalho da Categoria */}
+                  <div
+                    className="px-2.5 py-1 text-white font-mono flex items-center justify-between text-[9.5px] font-bold"
+                    style={{ backgroundColor: catGroup.meta.color }}
+                  >
+                    <span className="uppercase tracking-wide flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-white/80" />
+                      {catGroup.meta.label}
+                    </span>
+                    <span className="bg-black/30 px-1.5 py-0.5 rounded text-[8.5px]">
+                      {catGroup.items.length} itens ({catGroup.totalCount} un)
+                    </span>
+                  </div>
+
+                  {/* Grid de Cards dos Símbolos desta Categoria */}
+                  <div className="p-2 grid grid-cols-2 gap-2 text-[9px]">
+                    {catGroup.items.map((item) => (
+                      <div
+                        key={item.symbol.id}
+                        className="border border-slate-200 rounded p-1.5 bg-white flex items-start gap-2 hover:bg-slate-50 transition"
+                      >
+                        {/* Pictograma Vetorial */}
+                        <div className="w-12 h-10 shrink-0 flex items-center justify-center bg-slate-50 rounded border border-slate-300 p-0.5 overflow-hidden">
+                          <SymbolGlyph symbol={item.symbol} width={38} height={38} />
+                        </div>
+
+                        {/* Informações Técnicas e Normativas */}
+                        <div className="flex-1 min-w-0 leading-tight">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="font-black text-red-700 font-mono text-[10px]">
+                              {item.symbol.codigo_normativo || item.symbol.codigo_interno}
+                            </span>
+                            <span className="font-bold font-mono text-[8.5px] bg-slate-100 text-slate-900 px-1 rounded border border-slate-300">
+                              {item.count} un
+                            </span>
+                          </div>
+
+                          <div className="font-bold text-slate-900 text-[9px] truncate" title={item.symbol.nome}>
+                            {item.symbol.nome}
+                          </div>
+
+                          <div className="text-[8px] text-slate-500 flex flex-wrap gap-x-2 mt-0.5">
+                            <span>Dim: <strong className="text-slate-700 font-mono">{item.dimensions}</strong></span>
+                            <span>Visib: <strong className="text-slate-700 font-mono">≤ {item.viewDistanceMeters}m</strong></span>
+                          </div>
+
+                          <div className="text-[7.5px] text-slate-600 mt-0.5 font-mono truncate">
+                            Fotolum: {item.luminance}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* COLUNA DIREITA (340px): REQUISITOS NORMATIVOS, CRITÉRIOS DE INSTALAÇÃO E RESUMO */}
+          <div className="w-[340px] shrink-0 border-l-2 border-black flex flex-col bg-white overflow-hidden text-[9px]">
+            {/* 1. QUADRO DE NOTAS TÉCNICAS E DIRETRIZES DO CORPO DE BOMBEIROS */}
+            <div className="p-3 bg-slate-50 border-b-2 border-black space-y-2">
+              <div className="font-bold uppercase tracking-wider text-[10px] text-slate-900 border-b border-slate-300 pb-1 flex items-center justify-between">
+                <span>DIRETRIZES DE INSTALAÇÃO</span>
+                <span className="text-[8px] font-mono text-slate-500">ABNT NBR 13434</span>
+              </div>
+              <ul className="space-y-1 text-[8.5px] text-slate-700 leading-tight">
+                <li className="flex items-start gap-1.5">
+                  <span className="text-red-600 font-bold">•</span>
+                  <span><strong>Altura padrão:</strong> Instalação a 1,80 m do piso acabado medidos até a base da placa.</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-red-600 font-bold">•</span>
+                  <span><strong>Portas de saída:</strong> Placas sobre vergas instaladas diretamente acima do vão, a 2,10 m a 2,50 m.</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-red-600 font-bold">•</span>
+                  <span><strong>Extintores e Hidrantes:</strong> Placa de identificação imediatamente acima do equipamento, com sinalização de solo regulamentar (1,00 x 1,00 m).</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <span className="text-red-600 font-bold">•</span>
+                  <span><strong>Fotoluminescência:</strong> Atender requisitos NBR 16820 Classe C com ensaio fotométrico comprovado pelo fabricante.</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* 2. QUADRO RESUMO DE QUANTITATIVOS POR CLASSE NORMATIVA */}
+            <div className="flex-1 p-3 overflow-y-auto flex flex-col">
+              <div className="font-bold uppercase tracking-wider text-[10px] text-slate-900 border-b border-slate-300 pb-1 mb-2">
+                RESUMO POR CLASSE DE SINALIZAÇÃO
+              </div>
+              <table className="w-full border-collapse text-[8.5px]">
+                <thead>
+                  <tr className="bg-slate-900 text-white font-mono uppercase text-[7.5px]">
+                    <th className="p-1 text-left">Classe / Grupo</th>
+                    <th className="p-1 text-center w-12">Tipos</th>
+                    <th className="p-1 text-right w-14">Total (un)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {dynamicLegendByCategory.map((cg) => (
+                    <tr key={cg.categoryKey} className="hover:bg-slate-50">
+                      <td className="p-1 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cg.meta.color }} />
+                        <span className="font-semibold text-slate-800 truncate" title={cg.meta.label}>
+                          {cg.meta.label.split(' ')[0]} {cg.meta.label.split(' ')[1] || ''}
+                        </span>
+                      </td>
+                      <td className="p-1 text-center font-mono text-slate-600">{cg.items.length}</td>
+                      <td className="p-1 text-right font-mono font-bold text-slate-900">{cg.totalCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-black bg-slate-100 font-bold">
+                    <td className="p-1 text-slate-900 uppercase">Total Geral</td>
+                    <td className="p-1 text-center font-mono text-slate-900">{dynamicLegendItems.length}</td>
+                    <td className="p-1 text-right font-mono text-emerald-800 text-[9px]">{totalDynamicSignsCount}</td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              {/* Notas de Responsabilidade Técnica */}
+              <div className="mt-auto pt-3 border-t border-slate-200 text-[8px] text-slate-500">
+                <p>• As placas devem ser fixadas de maneira segura e indelével.</p>
+                <p>• Inspeção periódica conforme ABNT NBR 16820 a cada 6 meses.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. CARIMBO / SELO TÉCNICO OFICIAL ABNT NBR 6492 NO RODAPÉ */}
+        <div className="h-28 bg-white border-t-2 border-black grid grid-cols-12 divide-x-2 divide-black text-[10px] select-none shrink-0">
+          {/* Identificação do Projeto / Software */}
+          <div className="col-span-3 p-2 flex flex-col justify-between bg-slate-50">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded bg-red-700 flex items-center justify-center text-white font-bold text-base shadow-xs">
+                SF
+              </div>
+              <div>
+                <strong className="text-xs font-black tracking-tight text-black block leading-none">
+                  SIGNAFLUX PRO
+                </strong>
+                <span className="text-[8px] text-slate-500 font-mono">
+                  Fire Safety CAD Platform
+                </span>
+              </div>
+            </div>
+            <div className="text-[8px] text-slate-600 border-t border-slate-300 pt-1 leading-tight">
+              Sistema Integrado de Prevenção e Combate a Incêndio • Normas ABNT NBR 13434 / 16820
+            </div>
+          </div>
+
+          {/* Dados do Empreendimento e Local */}
+          <div className="col-span-4 p-2 flex flex-col justify-between">
+            <div>
+              <span className="text-[8px] font-bold text-slate-400 block uppercase leading-none mb-0.5">
+                Empreendimento / Obra
+              </span>
+              <strong className="text-xs text-black block truncate">
+                {empreendimento || project.nome}
+              </strong>
+              <span className="text-[9px] text-slate-600 block truncate">
+                {endereco || 'Localização não informada'}
+              </span>
+            </div>
+            <div className="border-t border-slate-200 pt-0.5 flex justify-between text-[8px] text-slate-500">
+              <span>Cliente: <strong className="text-black">{cliente || 'Não informado'}</strong></span>
+              <span>Data: <strong className="text-black">{new Date().toLocaleDateString('pt-BR')}</strong></span>
+            </div>
+          </div>
+
+          {/* Conteúdo da Prancha e Responsável Técnico */}
+          <div className="col-span-3 p-2 flex flex-col justify-between">
+            <div>
+              <span className="text-[8px] font-bold text-slate-400 block uppercase leading-none mb-0.5">
+                Conteúdo da Folha
+              </span>
+              <strong className="text-[11px] text-black block leading-tight font-black uppercase">
+                LEGENDA TÉCNICA NORMATIVA
+              </strong>
+              <span className="text-[9px] text-slate-700 block">
+                Especificações e Diretrizes de Sinalização de Emergência
+              </span>
+            </div>
+            <div className="border-t border-slate-200 pt-0.5 text-[8px] text-slate-600 flex justify-between">
+              <span>Resp: <strong className="text-black">{responsavelTecnico || 'Engenharia'}</strong></span>
+              <span>CREA/CAU: <strong className="text-black">{creaCau || 'S/N'}</strong></span>
+            </div>
+          </div>
+
+          {/* Código da Prancha, Escala e Folha */}
+          <div className="col-span-2 p-2 flex flex-col justify-between bg-slate-50 text-right">
+            <div className="flex justify-between items-start">
+              <span className="text-[8px] font-bold text-slate-500 uppercase">REV.</span>
+              <strong className="text-xs font-mono text-black">{revisao}</strong>
+            </div>
+            <div>
+              <span className="text-[8px] font-bold text-slate-400 block uppercase leading-none">
+                PRANCHA
+              </span>
+              <strong className="text-base font-black font-mono text-red-700 tracking-tight block">
+                FOLHA 03/03
+              </strong>
+              <span className="text-[8px] text-slate-500 font-mono block">
+                FORMATO A3 (420x297mm)
+              </span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex-1 bg-slate-950 text-slate-100 flex flex-col overflow-hidden font-sans print:p-0 print:bg-white print:text-black">
       {/* Input oculto para importação de imagem de planta */}
@@ -1677,6 +2155,15 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
               Folha 02: Orçamento ABNT
             </button>
             <button
+              onClick={() => setActiveSheetTab('legend')}
+              className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
+                activeSheetTab === 'legend' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <ListFilter className="w-3.5 h-3.5" />
+              Folha 03: Legenda Dinâmica
+            </button>
+            <button
               onClick={() => setActiveSheetTab('both')}
               className={`px-2.5 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition ${
                 activeSheetTab === 'both' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
@@ -1704,8 +2191,8 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
             </select>
           </div>
 
-          {/* Seleção de Escala Técnica (apenas na folha de desenho) */}
-          {activeSheetTab !== 'budget' && (
+          {/* Seleção de Escala Técnica (apenas na folha de desenho ou integrada) */}
+          {(activeSheetTab === 'drawing' || activeSheetTab === 'unified' || activeSheetTab === 'both') && (
             <div className="flex items-center gap-1.5 pl-2 border-l border-slate-700">
               <span className="text-slate-400 text-[11px]">Escala:</span>
               <select
@@ -1724,7 +2211,7 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
           )}
 
           {/* Modo de Exibição do Símbolo */}
-          {activeSheetTab !== 'budget' && (
+          {(activeSheetTab === 'drawing' || activeSheetTab === 'unified' || activeSheetTab === 'both') && (
             <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
               <button
                 onClick={() => setSymbolDisplayMode('badge')}
@@ -1748,7 +2235,7 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
           )}
 
           {/* Filtro de Escopo do Orçamento (quando na folha de orçamento) */}
-          {activeSheetTab !== 'drawing' && (
+          {activeSheetTab === 'budget' && (
             <div className="flex items-center gap-1.5 pl-2 border-l border-slate-700">
               <span className="text-slate-400 text-[11px]">Escopo Orçado:</span>
               <select
@@ -1759,6 +2246,47 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
                 <option value="floor">Apenas {activeFloor.name}</option>
                 <option value="project">Todo o Empreendimento (Global)</option>
               </select>
+            </div>
+          )}
+
+          {/* Controles Específicos da Legenda Dinâmica (quando na folha de legenda) */}
+          {activeSheetTab === 'legend' && (
+            <div className="flex items-center gap-2 pl-2 border-l border-slate-700">
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400 text-[11px]">Escopo:</span>
+                <select
+                  value={legendScope}
+                  onChange={(e) => setLegendScope(e.target.value as 'floor' | 'project')}
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-emerald-400 font-bold"
+                >
+                  <option value="floor">Pavimento ({activeFloor.name})</option>
+                  <option value="project">Todo o Empreendimento (Global)</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400 text-[11px]">Agrupar:</span>
+                <select
+                  value={legendGrouping}
+                  onChange={(e) => setLegendGrouping(e.target.value as 'category' | 'code')}
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white"
+                >
+                  <option value="category">Por Categoria ABNT</option>
+                  <option value="code">Por Código</option>
+                </select>
+              </div>
+
+              <button
+                onClick={() => setIncludeLegendSpecs(!includeLegendSpecs)}
+                className={`px-2 py-1 rounded text-xs font-semibold transition border ${
+                  includeLegendSpecs 
+                    ? 'bg-slate-800 border-sky-500 text-sky-300' 
+                    : 'bg-slate-950 border-slate-800 text-slate-400'
+                }`}
+                title="Exibir cálculo de distância máxima de visibilidade e especificações técnicas"
+              >
+                {includeLegendSpecs ? '✓ Specs & Visibilidade' : 'Specs Simples'}
+              </button>
             </div>
           )}
         </div>
@@ -1836,20 +2364,7 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
                 <button
                   onClick={() => {
                     setShowExportMenu(false);
-                    handleExecutePdfExport({
-                      content: 'unified',
-                      quality: 'high',
-                      imageFormat: 'jpeg',
-                      includeFloorPlan: true,
-                      includeCadEntities: true,
-                      includeNorthCompass: true,
-                      includeGraphicScale: true,
-                      symbolDisplayMode,
-                      budgetScope,
-                      includeNormativeNotes: true,
-                      includeCategorySummary: true,
-                      includeSignatures: true
-                    });
+                    handleExecutePdfExport(createExportConfig({ content: 'unified' }));
                   }}
                   className="w-full text-left px-3 py-2.5 hover:bg-slate-800 flex items-start gap-2.5 text-white transition bg-red-950/20"
                 >
@@ -1867,32 +2382,22 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
 
                 <div className="border-t border-slate-800 my-1" />
 
-                {/* Opção 02: Dossiê Completo 2 Folhas */}
+                {/* Opção 02: Dossiê Completo 3 Folhas */}
                 <button
                   onClick={() => {
                     setShowExportMenu(false);
-                    handleExecutePdfExport({
+                    handleExecutePdfExport(createExportConfig({ 
                       content: 'dossier',
-                      quality: 'high',
-                      imageFormat: 'jpeg',
-                      includeFloorPlan: true,
-                      includeCadEntities: true,
-                      includeNorthCompass: true,
-                      includeGraphicScale: true,
-                      symbolDisplayMode,
-                      budgetScope,
-                      includeNormativeNotes: true,
-                      includeCategorySummary: true,
-                      includeSignatures: true
-                    });
+                      includeLegendSheetInDossier: true
+                    }));
                   }}
                   className="w-full text-left px-3 py-2.5 hover:bg-slate-800 flex items-start gap-2.5 text-white transition"
                 >
                   <BookOpen className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                   <div>
-                    <div className="font-bold text-xs">Caderno Técnico Completo (2 Folhas A3)</div>
+                    <div className="font-bold text-xs">Caderno Técnico Completo (3 Folhas A3)</div>
                     <div className="text-[10px] text-slate-400">
-                      Prancha Gráfica + Quadro Consolidado de Orçamento e Normas ABNT
+                      Folha 01 (Gráfica) + Folha 02 (Orçamento) + Folha 03 (Legenda Técnica Dinâmica)
                     </div>
                   </div>
                 </button>
@@ -1902,20 +2407,7 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
                 <button
                   onClick={() => {
                     setShowExportMenu(false);
-                    handleExecutePdfExport({
-                      content: 'drawing',
-                      quality: 'high',
-                      imageFormat: 'jpeg',
-                      includeFloorPlan: true,
-                      includeCadEntities: true,
-                      includeNorthCompass: true,
-                      includeGraphicScale: true,
-                      symbolDisplayMode,
-                      budgetScope,
-                      includeNormativeNotes: true,
-                      includeCategorySummary: true,
-                      includeSignatures: true
-                    });
+                    handleExecutePdfExport(createExportConfig({ content: 'drawing' }));
                   }}
                   className="w-full text-left px-3 py-2 hover:bg-slate-800 flex items-start gap-2 text-slate-200 transition"
                 >
@@ -1929,20 +2421,7 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
                 <button
                   onClick={() => {
                     setShowExportMenu(false);
-                    handleExecutePdfExport({
-                      content: 'budget',
-                      quality: 'high',
-                      imageFormat: 'jpeg',
-                      includeFloorPlan: true,
-                      includeCadEntities: true,
-                      includeNorthCompass: true,
-                      includeGraphicScale: true,
-                      symbolDisplayMode,
-                      budgetScope,
-                      includeNormativeNotes: true,
-                      includeCategorySummary: true,
-                      includeSignatures: true
-                    });
+                    handleExecutePdfExport(createExportConfig({ content: 'budget' }));
                   }}
                   className="w-full text-left px-3 py-2 hover:bg-slate-800 flex items-start gap-2 text-slate-200 transition"
                 >
@@ -1950,6 +2429,20 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
                   <div>
                     <div className="font-semibold text-xs">Folha 02: Orçamento ABNT A3</div>
                     <div className="text-[10px] text-slate-400">Tabela de custos, quantitativos e laudos</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    handleExecutePdfExport(createExportConfig({ content: 'legend_sheet' }));
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-800 flex items-start gap-2 text-emerald-300 transition"
+                >
+                  <ListFilter className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                  <div>
+                    <div className="font-semibold text-xs">Folha 03: Legenda Dinâmica A3</div>
+                    <div className="text-[10px] text-slate-400">Diretrizes NBR 13434, distâncias e cards técnicos</div>
                   </div>
                 </button>
 
@@ -2097,7 +2590,7 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
           <div className="flex flex-col items-center page-break-after">
             {activeSheetTab === 'both' && (
               <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 print:hidden flex items-center gap-1.5">
-                <span className="bg-sky-900 text-sky-200 px-2 py-0.5 rounded font-mono">FOLHA 01 / 02</span>
+                <span className="bg-sky-900 text-sky-200 px-2 py-0.5 rounded font-mono">FOLHA 01 / 03</span>
                 <span>PRANCHA GRÁFICA DE SINALIZAÇÃO E EQUIPAMENTOS</span>
               </div>
             )}
@@ -2107,14 +2600,33 @@ export const PranchasA3View: React.FC<PranchasA3ViewProps> = ({
 
         {/* FOLHA 02: Visível quando ativa */}
         {(activeSheetTab === 'budget' || activeSheetTab === 'both') && (
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center page-break-after">
             {activeSheetTab === 'both' && (
               <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 print:hidden flex items-center gap-1.5">
-                <span className="bg-amber-900 text-amber-200 px-2 py-0.5 rounded font-mono">FOLHA 02 / 02</span>
+                <span className="bg-amber-900 text-amber-200 px-2 py-0.5 rounded font-mono">FOLHA 02 / 03</span>
                 <span>QUADRO GERAL CONSOLIDADO DE ORÇAMENTO E QUANTITATIVOS ABNT</span>
               </div>
             )}
             {renderBudgetSheet()}
+          </div>
+        )}
+
+        {/* FOLHA 03: LEGENDA DINÂMICA: Visível quando ativa */}
+        {(activeSheetTab === 'legend' || activeSheetTab === 'both') && (
+          <div className="flex flex-col items-center">
+            {activeSheetTab === 'both' && (
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 print:hidden flex items-center gap-1.5">
+                <span className="bg-emerald-900 text-emerald-200 px-2 py-0.5 rounded font-mono">FOLHA 03 / 03</span>
+                <span>LEGENDA TÉCNICA NORMATIVA & DIRETRIZES DE SINALIZAÇÃO ABNT NBR 13434</span>
+              </div>
+            )}
+            {activeSheetTab === 'legend' && (
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 print:hidden flex items-center gap-1.5">
+                <span className="bg-emerald-900 text-emerald-200 px-2 py-0.5 rounded font-mono">FOLHA 03 (LEGENDA DINÂMICA)</span>
+                <span>LEGENDA TÉCNICA NORMATIVA & ESPECIFICAÇÕES ABNT NBR 13434 / NBR 16820</span>
+              </div>
+            )}
+            {renderLegendSheet()}
           </div>
         )}
 

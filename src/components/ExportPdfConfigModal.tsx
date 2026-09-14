@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 export interface PdfExportConfig {
-  content: 'unified' | 'dossier' | 'drawing' | 'budget';
+  content: 'unified' | 'dossier' | 'drawing' | 'budget' | 'legend_sheet';
   quality: 'high' | 'ultra' | 'draft';
   imageFormat: 'jpeg' | 'png';
   includeFloorPlan: boolean;
@@ -19,6 +19,15 @@ export interface PdfExportConfig {
   includeNormativeNotes: boolean;
   includeCategorySummary: boolean;
   includeSignatures: boolean;
+  // Configurações da Legenda Dinâmica em PDF
+  legendMode: 'floor' | 'project';
+  legendGrouping: 'category' | 'code';
+  includeLegendSpecs: boolean;
+  includeLegendQuantities: boolean;
+  includeLegendSheetInDossier: boolean;
+  // Otimizações de Renderização PDF
+  optimizeRendering: boolean;
+  vectorAntiAliasing: boolean;
 }
 
 interface ExportPdfConfigModalProps {
@@ -48,7 +57,7 @@ export const ExportPdfConfigModal: React.FC<ExportPdfConfigModalProps> = ({
   progressPercent,
   onExecuteExport
 }) => {
-  const [content, setContent] = useState<'unified' | 'dossier' | 'drawing' | 'budget'>('unified');
+  const [content, setContent] = useState<'unified' | 'dossier' | 'drawing' | 'budget' | 'legend_sheet'>('unified');
   const [quality, setQuality] = useState<'high' | 'ultra' | 'draft'>('high');
   const [imageFormat, setImageFormat] = useState<'jpeg' | 'png'>('jpeg');
   const [includeFloorPlan, setIncludeFloorPlan] = useState<boolean>(true);
@@ -60,6 +69,17 @@ export const ExportPdfConfigModal: React.FC<ExportPdfConfigModalProps> = ({
   const [includeNormativeNotes, setIncludeNormativeNotes] = useState<boolean>(true);
   const [includeCategorySummary, setIncludeCategorySummary] = useState<boolean>(true);
   const [includeSignatures, setIncludeSignatures] = useState<boolean>(true);
+
+  // Configurações da Legenda Dinâmica
+  const [legendMode, setLegendMode] = useState<'floor' | 'project'>('floor');
+  const [legendGrouping, setLegendGrouping] = useState<'category' | 'code'>('category');
+  const [includeLegendSpecs, setIncludeLegendSpecs] = useState<boolean>(true);
+  const [includeLegendQuantities, setIncludeLegendQuantities] = useState<boolean>(true);
+  const [includeLegendSheetInDossier, setIncludeLegendSheetInDossier] = useState<boolean>(true);
+
+  // Otimizações de Renderização PDF
+  const [optimizeRendering, setOptimizeRendering] = useState<boolean>(true);
+  const [vectorAntiAliasing, setVectorAntiAliasing] = useState<boolean>(true);
 
   if (!isOpen) return null;
 
@@ -76,7 +96,14 @@ export const ExportPdfConfigModal: React.FC<ExportPdfConfigModalProps> = ({
       budgetScope,
       includeNormativeNotes,
       includeCategorySummary,
-      includeSignatures
+      includeSignatures,
+      legendMode,
+      legendGrouping,
+      includeLegendSpecs,
+      includeLegendQuantities,
+      includeLegendSheetInDossier,
+      optimizeRendering,
+      vectorAntiAliasing
     });
   };
 
@@ -238,16 +265,158 @@ export const ExportPdfConfigModal: React.FC<ExportPdfConfigModalProps> = ({
                 </div>
               </div>
 
+              {/* Opção 05: Folha Exclusiva de Legenda Técnica Dinâmica A3 */}
+              <div
+                onClick={() => setContent('legend_sheet')}
+                className={`p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between md:col-span-2 ${
+                  content === 'legend_sheet'
+                    ? 'bg-purple-950/40 border-purple-500 shadow-md ring-1 ring-purple-500/50'
+                    : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-extrabold text-white text-xs flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-purple-400" />
+                      Folha 03: Legenda Técnica Dinâmica ABNT (Prancha A3 Exclusiva)
+                    </span>
+                    <span className="bg-purple-900/60 text-purple-300 border border-purple-700/50 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                      Folha 03 - NBR 13434 / NBR 16820
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Prancha A3 dedicada integralmente à Legenda Normativa: cards com pictogramas de alta definição, códigos regulamentares, dimensões em milímetros, classes fotoluminescentes, distâncias de visualização e notas técnicas do Corpo de Bombeiros.
+                  </p>
+                </div>
+                <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] font-mono text-purple-400">
+                  <span>Fichas técnicas individuais de cada sinalizador instalado</span>
+                  {content === 'legend_sheet' && <Check className="w-4 h-4 text-purple-400" />}
+                </div>
+              </div>
+
             </div>
           </div>
 
-          {/* 2. RESOLUÇÃO E QUALIDADE DE RENDERIZAÇÃO */}
+          {/* 2. CONFIGURAÇÃO AVANÇADA DA LEGENDA DINÂMICA EM PDF */}
+          <div className="bg-slate-950 p-4 rounded-xl border border-purple-900/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-white uppercase tracking-wider block flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-purple-400" />
+                2. Configuração da Legenda Dinâmica em PDF
+              </label>
+              <span className="bg-purple-950 text-purple-300 text-[10px] font-bold px-2 py-0.5 rounded border border-purple-800">
+                NBR 13434 • NBR 16820 • IT-20
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              {/* Escopo da Legenda Dinâmica */}
+              <div className="space-y-2">
+                <span className="text-[11px] text-slate-400 font-bold block">Escopo dos Símbolos na Legenda:</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLegendMode('floor')}
+                    className={`p-2 rounded-lg border text-left text-xs transition ${
+                      legendMode === 'floor'
+                        ? 'bg-purple-950/60 border-purple-500 text-white font-bold'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="font-semibold text-white">Pavimento Atual</div>
+                    <div className="text-[10px] text-slate-400">Apenas {activeFloor.name}</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLegendMode('project')}
+                    className={`p-2 rounded-lg border text-left text-xs transition ${
+                      legendMode === 'project'
+                        ? 'bg-purple-950/60 border-purple-500 text-white font-bold'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="font-semibold text-white">Global do Projeto</div>
+                    <div className="text-[10px] text-slate-400">Todos os pavimentos</div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Critério de Agrupamento */}
+              <div className="space-y-2">
+                <span className="text-[11px] text-slate-400 font-bold block">Agrupamento Normativo:</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLegendGrouping('category')}
+                    className={`p-2 rounded-lg border text-left text-xs transition ${
+                      legendGrouping === 'category'
+                        ? 'bg-purple-950/60 border-purple-500 text-white font-bold'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="font-semibold text-white">Por Categorias ABNT</div>
+                    <div className="text-[10px] text-slate-400">Salvamento, Combate, etc.</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLegendGrouping('code')}
+                    className={`p-2 rounded-lg border text-left text-xs transition ${
+                      legendGrouping === 'code'
+                        ? 'bg-purple-950/60 border-purple-500 text-white font-bold'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="font-semibold text-white">Código Sequencial</div>
+                    <div className="text-[10px] text-slate-400">S1, S2, E1, E2, M1...</div>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Opções Detalhadas da Legenda */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-slate-800">
+              <label className="flex items-center gap-2 p-1.5 text-xs text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeLegendSpecs}
+                  onChange={(e) => setIncludeLegendSpecs(e.target.checked)}
+                  className="rounded text-purple-500"
+                />
+                <span>Dimensões e Fotoluminescência</span>
+              </label>
+
+              <label className="flex items-center gap-2 p-1.5 text-xs text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeLegendQuantities}
+                  onChange={(e) => setIncludeLegendQuantities(e.target.checked)}
+                  className="rounded text-purple-500"
+                />
+                <span>Contadores de Peças Locadas</span>
+              </label>
+
+              <label className="flex items-center gap-2 p-1.5 text-xs text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeLegendSheetInDossier}
+                  onChange={(e) => setIncludeLegendSheetInDossier(e.target.checked)}
+                  className="rounded text-purple-500"
+                />
+                <span>Anexar Folha 03 no Dossiê Completo</span>
+              </label>
+            </div>
+          </div>
+
+          {/* 3. OTIMIZAÇÃO AVANÇADA DA RENDERIZAÇÃO PDF */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
-              <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                2. Fidelidade e Resolução de Plotagem
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  3. Fidelidade e Resolução de Plotagem
+                </label>
+                <span className="text-[10px] text-emerald-400 font-mono font-bold">html2canvas-pro + jsPDF</span>
+              </div>
 
               <div className="space-y-2">
                 <label className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800 cursor-pointer hover:border-slate-700 transition">
@@ -260,7 +429,7 @@ export const ExportPdfConfigModal: React.FC<ExportPdfConfigModalProps> = ({
                       className="text-sky-500"
                     />
                     <div>
-                      <span className="font-bold text-white text-xs">Alta Definição (300 DPI - Escala 2.2x)</span>
+                      <span className="font-bold text-white text-xs">Alta Definição (300 DPI - Escala 2.5x)</span>
                       <span className="text-[10px] text-slate-400 block">Excelente para plotters A3, pranchas e envio oficial ao Bombeiro</span>
                     </div>
                   </div>
@@ -294,7 +463,7 @@ export const ExportPdfConfigModal: React.FC<ExportPdfConfigModalProps> = ({
                       className="text-sky-500"
                     />
                     <div>
-                      <span className="font-bold text-white text-xs">Rápida / Pré-visualização (150 DPI - Escala 1.6x)</span>
+                      <span className="font-bold text-white text-xs">Rápida / Pré-visualização (150 DPI - Escala 1.8x)</span>
                       <span className="text-[10px] text-slate-400 block">Geração ultra veloz com menor tamanho de arquivo</span>
                     </div>
                   </div>
@@ -313,7 +482,7 @@ export const ExportPdfConfigModal: React.FC<ExportPdfConfigModalProps> = ({
                       imageFormat === 'jpeg' ? 'bg-sky-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-white'
                     }`}
                   >
-                    JPEG 98% (Equilibrado)
+                    JPEG 98% (Otimizado)
                   </button>
                   <button
                     type="button"
@@ -325,6 +494,28 @@ export const ExportPdfConfigModal: React.FC<ExportPdfConfigModalProps> = ({
                     PNG (Sem Perdas)
                   </button>
                 </div>
+              </div>
+
+              {/* Otimização de Performance e Memória */}
+              <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={optimizeRendering}
+                    onChange={(e) => setOptimizeRendering(e.target.checked)}
+                    className="rounded text-sky-500"
+                  />
+                  <span>Aceleração de Renderização (Limpeza de memória & Remoção de sombras)</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={vectorAntiAliasing}
+                    onChange={(e) => setVectorAntiAliasing(e.target.checked)}
+                    className="rounded text-sky-500"
+                  />
+                  <span>Suavização Vetorial Geométrica (geometricPrecision em nós SVG)</span>
+                </label>
               </div>
             </div>
 
